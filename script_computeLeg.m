@@ -35,7 +35,7 @@ end
 while n <= n_max 
         
     [X, w_Leg, d_Leg, K_Leg ] = compute_LegendreRule( dim, domain, n );
-    [dim, counter3, n ]
+    %[dim, counter3, n ]
     
     % save points, weights, and d and K in a matrix
     CF_Leg = zeros(n^dim,dim+2); % initiate 

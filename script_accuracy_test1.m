@@ -5,11 +5,12 @@ clc, clear
 
 % free parameters
 dim = 2; % dimension (1,2,3)
-points = 'equid'; % points (equid, uniform, Halton)
+points = 'Halton'; % points (equid, uniform, Halton)
 noise_level = 0; % 0, 10^(-6)
 
 % fixed parameters
 domain = 'cube'; % domain (cube, ball) 
+volume = 2^dim;
 weightFun = '1'; % weight function - 1, C2k, sqrt(r)
 
 omega = generate_weightFun( weightFun, dim); 
@@ -19,45 +20,33 @@ if dim == 1
     I = 2*atan(1); % exact integral 
     n = 20;
     n_max = 400; 
-    n_lenght = 20;
 elseif dim == 2 
     f = @(x,y) (1./(1+x.^2)).*(1./(1+y.^2)); % test function 
     I = (2*atan(1))^2; % exact integral 
     n = 4;
     n_max = 40; 
-    n_lenght = 19;
 else 
     f = @(x,y,z) (1./(1+x.^2)).*(1./(1+y.^2)).*(1./(1+z.^2)); % test function 
     I = (2*atan(1))^3; % exact integral 
     n = 4;
     n_max = 16; 
-    n_lenght = 13;
 end
 
-NN_Leg = zeros(n_lenght,1); 
-err_Leg = zeros(n_lenght,1);
-NN_MC = zeros(n_lenght,1); 
-err_MC = zeros(n_lenght,1);
-NN_LS = zeros(n_lenght,1); 
-err_LS = zeros(n_lenght,1);
-NN_LS2 = zeros(n_lenght,1); 
-err_LS2 = zeros(n_lenght,1);
-NN_l1 = zeros(n_lenght,1); 
-err_l1 = zeros(n_lenght,1);
-i = 1;
+NN_Leg = []; NN_MC = []; NN_LS = []; NN_l1 = []; % number of data points 
+err_Leg = []; err_MC = []; err_LS = []; err_l1 = []; % errors 
 
 while n <= n_max 
     
     % Legendre rule 
     example = matfile(['CFs/CF_Leg_dim=',num2str(dim),'_',domain,'_n=',num2str(n),'.mat']);
     C = example.CF_Leg; 
-    [ M, aux] = size(C); % number of data points 
-    NN_Leg(i) = M;
+    [ N, aux] = size(C); 
+    NN_Leg = [NN_Leg; N];
     X = C(:,1:dim); % data points 
     w = C(:,dim+1); % weights 
     % function values 
-    f_values = zeros(M,1); 
-    for m = 1:M 
+    f_values = zeros(N,1); 
+    for m = 1:N 
        if dim == 1  
             f_values(m) = f( X(m,1) ).*omega( X(m,1) ); 
        elseif dim == 2  
@@ -69,21 +58,21 @@ while n <= n_max
        end
     end 
     % generate and add uniform noise 
-    noise = noise_level*(2*rand(M,1)-1); 
+    noise = noise_level*(2*rand(N,1)-1); 
     f_values = f_values + noise;
     CF = dot( w, f_values ); % value of the CF 
-    err_Leg(i) = abs( I - CF ); % absolute error
+    err_Leg = [err_Leg; abs( I - CF )]; % absolute error
     
-    % LS rule - dir
-    example = matfile(['CFs/CF_LS_dir_dim=',num2str(dim),'_',domain,'_',weightFun,'_',points,'_n=',num2str(n),'.mat']);
-    C = example.CF_LS_dir;
-    [ M, aux] = size(C); % number of data points 
-    NN_LS(i) = M;
+    % LS rule
+    example = matfile(['CFs/CF_LS_dim=',num2str(dim),'_',domain,'_',weightFun,'_',points,'_n=',num2str(n),'.mat']);
+    C = example.CF_LS;
+    [ N, aux] = size(C); 
+    NN_LS = [NN_LS; N];
     X = C(:,1:dim); % data points 
     w = C(:,dim+1); % weights 
     % function values 
-    f_values = zeros(M,1); 
-    for m = 1:M 
+    f_values = zeros(N,1); 
+    for m = 1:N 
        if dim == 1  
             f_values(m) = f( X(m,1) ); 
        elseif dim == 2  
@@ -95,47 +84,21 @@ while n <= n_max
        end
     end 
     % generate and add uniform noise 
-    noise = noise_level*(2*rand(M,1)-1); 
+    noise = noise_level*(2*rand(N,1)-1); 
     f_values = f_values + noise;
     CF = dot( w, f_values ); % value of the CF 
-    err_LS(i) = abs( I - CF ); % absolute error
-    
-    % LS rule - opt
-    example = matfile(['CFs/CF_LS_opt_dim=',num2str(dim),'_',domain,'_',weightFun,'_',points,'_n=',num2str(n),'.mat']);
-    C = example.CF_LS_opt;
-    [ M, aux] = size(C); % number of data points 
-    NN_LS2(i) = M; 
-    X = C(:,1:dim); % data points 
-    w = C(:,dim+1); % weights 
-    % function values 
-    f_values = zeros(M,1); 
-    for m = 1:M 
-       if dim == 1  
-            f_values(m) = f( X(m,1) ); 
-       elseif dim == 2  
-            f_values(m) = f( X(m,1), X(m,2) );
-       elseif dim == 3  
-            f_values(m) = f( X(m,1), X(m,2) , X(m,3) );
-       else 
-            error('Desired dimension not yet implemented!') 
-       end
-    end 
-    % generate and add uniform noise 
-    noise = noise_level*(2*rand(M,1)-1); 
-    f_values = f_values + noise;
-    CF = dot( w, f_values ); % value of the CF 
-    err_LS2(i) = abs( I - CF ); % absolute error
+    err_LS = [err_LS; abs( I - CF )]; % absolute error
     
     % l1 rule 
     example = matfile(['CFs/CF_l1_dim=',num2str(dim),'_',domain,'_',weightFun,'_',points,'_n=',num2str(n),'.mat']);
     C = example.CF_l1; 
-    [ M, aux] = size(C); 
-    NN_l1(i) = M; 
+    [ N, aux] = size(C); 
+    NN_l1 = [NN_l1; N]; 
     X = C(:,1:dim); % data points 
     w = C(:,dim+1); % weights 
     % function values 
-    f_values = zeros(M,1); 
-    for m = 1:NN_l1(i) 
+    f_values = zeros(N,1); 
+    for m = 1:N 
        if dim == 1  
             f_values(m) = f( X(m,1) ); 
        elseif dim == 2  
@@ -147,27 +110,27 @@ while n <= n_max
        end
     end 
     % generate and add uniform noise 
-    noise = noise_level*(2*rand(M,1)-1); 
+    noise = noise_level*(2*rand(N,1)-1); 
     f_values = f_values + noise;
     CF = dot( w, f_values ); % value of the CF 
-    err_l1(i) = abs( I - CF ); % absolute error
+    err_l1 = [err_l1; abs( I - CF )]; % absolute error
     
     % MC integration
-    NN_MC(i) = M; 
+    NN_MC = [NN_MC; N]; 
     % MC weights 
-    for m = 1:M 
+    for m = 1:N 
        if dim == 1  
-            w(m) = 2*omega( X(m,1) )/M; 
+            w(m) = volume*omega( X(m,1) )/N; 
        elseif dim == 2  
-            w(m) = 4*omega( X(m,1), X(m,2) )/M;
+            w(m) = volume*omega( X(m,1), X(m,2) )/N;
        elseif dim == 3  
-            w(m) = 8*omega( X(m,1), X(m,2) , X(m,3) )/M;
+            w(m) = volume*omega( X(m,1), X(m,2) , X(m,3) )/N;
        else 
             error('Desired dimension not yet implemented!') 
        end
     end 
     CF = dot( w, f_values ); % value of the CF 
-    err_MC(i) = abs( I - CF ); % absolute error
+    err_MC = [err_MC; abs( I - CF )]; % absolute error
     
     % increase n
     if dim == 1 
@@ -177,22 +140,27 @@ while n <= n_max
     else 
         n = n + 1;
     end
-    i = i+1;
     
 end
 
 % Plot the results
-figure(1)
-p = plot( NN_MC,err_MC,'m-.', NN_LS2,err_LS2,'r-', NN_l1,err_l1,'b--', NN_Leg,err_Leg,'k:' ); 
-set(p, 'LineWidth',2.5)
-set(gca, 'FontSize', 18)  % Increasing ticks fontsize
-xlim([ max([NN_Leg(1);NN_LS2(1);NN_l1(1)]), min([NN_Leg(end);NN_LS2(end);NN_l1(end)]) ]) 
-ylim([ min([err_LS2;err_l1;err_MC;err_Leg])-1, max([err_LS2;err_l1;err_MC;err_Leg])+1 ])
+figure(1) 
+p = plot( NN_MC,err_MC,'ms', NN_LS,err_LS,'r+', NN_l1,err_l1,'b^', NN_Leg,err_Leg,'ko');
+set(p, 'LineWidth',1.5)
+set(p, 'markersize',8)
+set(gca, 'FontSize', 20)  % Increasing ticks fontsize
+xlim([ max([NN_Leg(1);NN_LS(1)]), min([NN_Leg(end);NN_LS(end)]) ]) 
+ylim([ min([err_MC;err_LS;err_l1;err_Leg])/10, max([err_MC;err_LS;err_l1;err_Leg])*10 ])
 xlabel('$N$','Interpreter','latex') 
 ylabel('$|C[f] - I[f]|$','Interpreter','latex')
 set(gca, 'XScale', 'log')
 set(gca, 'YScale', 'log')
-id = legend('MC','LS','$\ell^1$','Legendre','Interpreter','latex','Location','southwest');
-set(id, 'Interpreter','latex', 'FontSize',22)
-str = sprintf( ['accuracy_test1_dim=',num2str(dim),'_',points,'.fig'] );
-%savefig(str); 
+if strcmp( points, 'Halton')
+    id = legend('QMC','LS','$\ell^1$','Legendre','Interpreter','latex','Location','southwest');
+else
+    id = legend('MC','LS','$\ell^1$','Legendre','Interpreter','latex','Location','southwest');
+end
+set(id, 'Interpreter','latex', 'FontSize',26)
+grid on
+str = sprintf( ['plots_accuracy/accuracy_test1_dim=',num2str(dim),'_',points,'.fig'] );
+%savefig(str);

@@ -1,4 +1,4 @@
-function Sample = generate_points( points, domain, dim, omega, M, uniform_aux )
+function Sample = generate_points( points, domain, dim, omega, M )
 
 % This function generates the desired sample of data points. 
 %   
@@ -8,12 +8,11 @@ function Sample = generate_points( points, domain, dim, omega, M, uniform_aux )
 %   dim:    Integer, dimension 
 %   omega:  weight function 
 %   M:      number of initial points
-%   uniform_aux: auxiliary vector of random points
 %
 % Output: 
 %   Sample: Structure containing
 %       N:      number of data points in the domain 
-%       coord:  the (X, XY, or XYZ) coordinates of the data points 
+%   coord:  the (X, XY, or XYZ) coordinates of the data points 
 %       
 
 Sample.N = M; % number of points N
@@ -23,7 +22,12 @@ Sample.dim = dim;
 if strcmp( domain, 'cube') 
     Sample.volume = 2^dim; % volume
 elseif strcmp( domain, 'ball') 
-    Sample.volume = pi^(0.5*dim)/gamma(0.5*dim + 1); % volume
+    Sample.volume = pi^(0.5*dim)/gamma(0.5*dim + 1); % volume 
+elseif strcmp( domain, 'combi') 
+    if dim ~= 2 
+       error('Desired dimension not yet implemented!') 
+    end
+    Sample.volume = pi + 1;
 else
     error('Desired domain not yet implemented!')
 end
@@ -76,7 +80,9 @@ elseif strcmp( points, 'Legendre')
         
 %% uniformly distributed points 
 elseif strcmp( points, 'uniform') 
-    Sample.coord = uniform_aux(1:Sample.N,:);
+    rng('default'); 
+    rng(1,'twister'); 
+    Sample.coord = 2*rand(Sample.N,dim)-1;
 
 %% semi-uniformly distributed points (add noise to equidistant points)
 elseif strcmp( points, 'semi-uniform') 
@@ -102,7 +108,9 @@ elseif strcmp( points, 'semi-uniform')
         error('Desired dimension not yet implemented!') 
     end  
     % add noise 
-    Sample.coord = Sample.coord + uniform_aux(1:Sample.N,:)/(4*n);
+    rng('default'); 
+    rng(1,'twister'); 
+    Sample.coord = Sample.coord + (2*rand(Sample.N,dim)-1)/(4*n);
     % remove points which are outside of the ball 
     n = 1; 
     while n <= Sample.N 
@@ -147,6 +155,20 @@ elseif strcmp( domain, 'ball')
     n = 1; 
     while n <= Sample.N 
         if norm(Sample.coord(n,:)) > 1 || Sample.r(n) == 0 % point lies outside of the ball or weight function is zero there
+            Sample.coord(n,:) = []; % remove point 
+            Sample.r(n) = [];
+            Sample.N = Sample.N - 1; % decrease number of points by 1
+        else
+            n = n+1; % check next point
+        end 
+    end
+
+%% Combi (this is a combination of a ball with radius 1 with center (0,0) and a cube with radius 0.5 and center (1.5,1.5). Implemented only in 2 dimensions!)
+elseif strcmp( domain, 'combi') 
+    Sample.coord = 2*Sample.coord; % stretches the data points to cover the cube with radius 2 and center (0,0) 
+    n = 1; 
+    while n <= Sample.N % check of points lies insider the integration domain 
+        if norm(Sample.coord(n,:),2) > 1 && norm(Sample.coord(n,:)-[1.5,1.5],inf) > 0.5 % point lies outside of the domain 
             Sample.coord(n,:) = []; % remove point 
             Sample.r(n) = [];
             Sample.N = Sample.N - 1; % decrease number of points by 1
